@@ -12,40 +12,39 @@ from datasets import Image as HFImage
 import math
 from collections import defaultdict
 
+# ======================================================
+# Configuración
+# ======================================================
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
 torch.set_num_threads(1)
-torch.backends.cudnn.benchmark = True 
+torch.backends.cudnn.benchmark = True
 
-
-
-# Configuración
-BATCH_SIZE   = 32
+BATCH_SIZE   = 45
 PIN_MEMORY   = True
 DROP_LAST    = True
 SEED         = 7
 
 # Tamaño de entrenamiento
-SIZE         = 256
-FINAL_SIZE   = 252  # usamos RandomResizedCrop directo a 252
+SIZE       = 256
+FINAL_SIZE = 252  # usamos RandomResizedCrop directo a 252
 
-# Targets de reducción (ajusta a gusto)
-CONTENT_KEEP = 10000   # COCO
-STYLE_KEEP   = 30000   # WikiArt
+# Targets de reducción
+CONTENT_KEEP = 10_000   # COCO
+STYLE_KEEP   = 5_000    # objetivo aprox de estilos buenos
 
 # Normalización ImageNet
 IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD  = [0.229, 0.224, 0.225]
 
 # Auto-select de workers (Kaggle suele tener 2 vCPU)
-CPU_COUNT = os.cpu_count() or 2
+CPU_COUNT   = os.cpu_count() or 2
 NUM_WORKERS = 2 if CPU_COUNT <= 2 else min(4, CPU_COUNT - 1)
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+DEVICE      = "cuda" if torch.cuda.is_available() else "cpu"
 
-
-# ============================================
+# ======================================================
 # Semillas
-# ============================================
+# ======================================================
 def set_seed(seed=SEED):
     random.seed(seed)
     np.random.seed(seed)
@@ -54,28 +53,31 @@ def set_seed(seed=SEED):
 
 def worker_seed_init(worker_id: int):
     seed = (torch.initial_seed() + worker_id) % 2**32
-    np.random.seed(seed); random.seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
 
 set_seed(SEED)
 
-# ============================================
-# Transforms (limpios)
-# ============================================
+# ======================================================
+# Transforms (content / style)
+# ======================================================
 content_tf = transforms.Compose([
     transforms.RandomResizedCrop(FINAL_SIZE, scale=(0.5, 1.0)),
     transforms.RandomHorizontalFlip(p=0.5),
     transforms.ToTensor(),
-    transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),])
+    transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),
+])
 
 style_tf = transforms.Compose([
     transforms.RandomResizedCrop(FINAL_SIZE, scale=(0.7, 1.0)),
     transforms.RandomHorizontalFlip(p=0.2),
     transforms.ToTensor(),
-    transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),])
+    transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),
+])
 
-# ============================================
+# ======================================================
 # Utilidades HF / PIL
-# ============================================
+# ======================================================
 def detect_image_col(ds):
     for c in ["image", "coco_url", "url", "image_url", "filepath", "file_name", "path"]:
         if c in ds.column_names:
@@ -83,22 +85,24 @@ def detect_image_col(ds):
     raise RuntimeError(f"No image-like column found. Columns: {ds.column_names}")
 
 def is_valid_image_entry(x):
-    if x is None: return False
+    if x is None:
+        return False
     if isinstance(x, list):
-        if len(x) == 0: return False
+        if len(x) == 0:
+            return False
         x = x[0]
     if hasattr(x, "size"):  # PIL.Image
         return True
     if isinstance(x, dict):
         return ("bytes" in x and x["bytes"] is not None) or ("path" in x and x["path"])
-    if isinstance(x, (bytes, bytearray)): return True
-    if isinstance(x, str): return x.startswith("http") or os.path.exists(x)
+    if isinstance(x, (bytes, bytearray)):
+        return True
+    if isinstance(x, str):
+        return x.startswith("http") or os.path.exists(x)
     return False
-
 
 def filter_valid_images(ds, img_key):
     return ds.filter(lambda ex: is_valid_image_entry(ex[img_key]), num_proc=1)
-
 
 def cast_to_image(ds, col_name):
     if col_name != "image":
@@ -123,17 +127,18 @@ def to_pil(x):
         return PILImage.open(x).convert("RGB")
     raise TypeError(f"No pude convertir a PIL: tipo={type(x)}")
 
-
-# ============================================
+# ======================================================
 # Dataset wrapper + collate
-# ============================================
+# ======================================================
 class HFDataset(torch.utils.data.Dataset):
     def __init__(self, hf_ds, img_key: str, transform):
         self.ds = hf_ds
         self.img_key = img_key
         self.tfm = transform
+
     def __len__(self):
         return self.ds.num_rows
+
     def __getitem__(self, idx):
         ex = self.ds[idx]
         img = to_pil(ex[self.img_key])
@@ -142,12 +147,11 @@ class HFDataset(torch.utils.data.Dataset):
 def collate_pixels(batch):
     return torch.stack(batch, dim=0)
 
-
-# ============================================
+# ======================================================
 # DataLoader optimizado
-# ============================================
-def make_loader(ds, batch_size=BATCH_SIZE, num_workers=NUM_WORKERS, pin=PIN_MEMORY,
-                drop_last=DROP_LAST, collate_fn=collate_pixels):
+# ======================================================
+def make_loader(ds, batch_size=BATCH_SIZE, num_workers=NUM_WORKERS,
+                pin=PIN_MEMORY, drop_last=DROP_LAST, collate_fn=collate_pixels):
     return DataLoader(
         ds,
         batch_size=batch_size,
@@ -158,12 +162,12 @@ def make_loader(ds, batch_size=BATCH_SIZE, num_workers=NUM_WORKERS, pin=PIN_MEMO
         collate_fn=collate_fn,
         persistent_workers=(num_workers > 0),
         prefetch_factor=4 if num_workers > 0 else None,
-        worker_init_fn=worker_seed_init)
+        worker_init_fn=worker_seed_init,
+    )
 
-
-# ============================================
+# ======================================================
 # Iterador dual (content + style)
-# ============================================
+# ======================================================
 def infinite_cycle(loader):
     while True:
         for batch in loader:
@@ -189,9 +193,9 @@ class DualBatchIterator:
 def make_train_iterator(content_loader, style_loader):
     return DualBatchIterator(content_loader, style_loader)
 
-
-
+# ======================================================
 # Recorte (uniforme) de datasets
+# ======================================================
 def truncate_dataloaders(content_loader: DataLoader,
                          style_loader: Optional[DataLoader] = None,
                          n: int = 60000,
@@ -219,7 +223,7 @@ def truncate_dataloaders(content_loader: DataLoader,
             num_workers=loader.num_workers,
             pin=loader.pin_memory,
             drop_last=loader.drop_last,
-            collate_fn=loader.collate_fn
+            collate_fn=loader.collate_fn,
         )
 
     content_small = shrink_dataset_from_loader(content_loader, n)
@@ -228,9 +232,11 @@ def truncate_dataloaders(content_loader: DataLoader,
     style_small = shrink_dataset_from_loader(style_loader, n)
     return content_small, style_small
 
-
-# Submuestreo estratificado para WikiArt
-def stratified_pick(hf_ds, group_col: str, target_total: int, seed: int = 77, min_per_group: int = 1):
+# ======================================================
+# Submuestreo estratificado
+# ======================================================
+def stratified_pick(hf_ds, group_col: str, target_total: int, seed: int = 77,
+                    min_per_group: int = 1):
     if group_col not in hf_ds.column_names:
         raise ValueError(f"'{group_col}' no está en {hf_ds.column_names}")
     rng = np.random.default_rng(seed)
@@ -263,5 +269,27 @@ def stratified_pick(hf_ds, group_col: str, target_total: int, seed: int = 77, mi
         picked = rng.choice(picked, size=target_total, replace=False).tolist()
 
     return sorted(picked)
+
+def add_brightness_stats(example):
+    img = to_pil(example[wiki_img_col]).convert("RGB").resize((64, 64))
+    arr = np.asarray(img).astype(np.float32) / 255.0
+    gray = 0.299 * arr[..., 0] + 0.587 * arr[..., 1] + 0.114 * arr[..., 2]
+    example["bright_mean"] = float(gray.mean())
+    example["bright_std"]  = float(gray.std())
+    return example
+
+
+def keep_reasonable_brightness(example):
+    bm = example["bright_mean"]
+    bs = example["bright_std"]
+    # ni muy oscuras ni lavadas
+    if not (0.15 < bm < 0.90):
+        return False
+    # con algo de contraste
+    if bs < 0.05:
+        return False
+    return True
+
+
 
 
