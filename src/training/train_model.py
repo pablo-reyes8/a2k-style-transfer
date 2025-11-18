@@ -7,6 +7,8 @@ from src.training.chekpoint import *
 from src.training.one_epoch import * 
 from src.data.load_data import make_train_iterator
 
+IMAGENET_MEAN = [0.485, 0.456, 0.406]
+IMAGENET_STD  = [0.229, 0.224, 0.225]
 
 IMAGENET_MEAN_T = torch.tensor(IMAGENET_MEAN).view(1, 3, 1, 1)  
 IMAGENET_STD_T  = torch.tensor(IMAGENET_STD).view(1, 3, 1, 1)   
@@ -34,27 +36,31 @@ def denorm_imagenet(x: torch.Tensor) -> torch.Tensor:
     return x
 
 def save_triplet_grid(
-    x_c: torch.Tensor,    # [B,3,H,W] content
-    x_s: torch.Tensor,    # [B,3,H,W] style
-    y: torch.Tensor,      # [B,3,H,W] mixed (output)
+    x_c: torch.Tensor,    # [B,3,H,W] content (normalizado)
+    x_s: torch.Tensor,    # [B,3,H,W] style   (normalizado)
+    y: torch.Tensor,      # [B,3,H,W] output  (NO normalizado ImageNet)
     out_path: str):
     """
-    Toma SIEMPRE el primer elemento del batch (índice 0) y guarda una
-    grilla 3x1 (vertical): content, style, mixed.
+    Grilla 3x1 (vertical): content, style, mixed.
     """
 
+    # content / style: vienen normalizados -> desnormalizar a [0,1]
     c0 = denorm_imagenet(x_c[0])
     s0 = denorm_imagenet(x_s[0])
-    y0 = denorm_imagenet(y[0])
+
+    # output: ya está en espacio de imagen; solo clamp [0,1]
+    y0 = y[0].detach().cpu()
+    y0 = y0.clamp(0.0, 1.0)
 
     grid = vutils.make_grid(
         torch.stack([c0, s0, y0], dim=0),
         nrow=1,
         padding=2)
-    
+
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     vutils.save_image(grid, out_path)
     print(f"└─ [SAMPLE] grid guardada en {out_path}")
+
 
 def _rule(n: int = 80) -> str:
     return "-" * n
@@ -91,7 +97,7 @@ def train_stya2k(
     style_loader   = None,
     train_iter     = None,
     # reanudación 
-    start_epoch: int = 0,              # epoca inicial 
+    start_epoch: int = 0,              # época inicial 
     init_global_step: int = 0,         # paso global acumulado previo
     scaler_state_dict: dict | None = None,   # estado previo del GradScaler (si usaste fp16)
     return_state: bool = True          # si True, retorna dict para reanudar luego
@@ -176,7 +182,7 @@ def train_stya2k(
         n_images   = ep_steps * B
         ips  = (n_images / sec) if sec > 0 else 0.0
 
-        print(f"{epoch:3d} | {global_step:10d} | {ep_loss:10.5f} | "
+        print(f"{epoch+1:3d} | {global_step:10d} | {ep_loss:10.5f} | "
               f"{ep_content:10.5f} | {ep_style:10.5f} | "
               f"{n_images:8d} | {ips:7.1f} | {_fmt_hms(sec):>8}")
 
@@ -197,18 +203,17 @@ def train_stya2k(
                 with autocast_ctx(device=device, enabled=amp_enabled, dtype=amp_dtype):
                     y = model(x_c, x_s)
 
-            out_path = os.path.join(sample_dir, f"{run_name}_e{epoch:03d}.png")
+            out_path = os.path.join(sample_dir, f"{run_name}_e{epoch+1:03d}.png")
             save_triplet_grid(x_c, x_s, y, out_path)
             model.train()
 
         # ----------------- CHECKPOINTING ------------------
         is_last_epoch = (epoch == start_epoch + epochs - 1)
         need_ckpt = (save_every > 0) and (
-            ((epoch - start_epoch + 1) % save_every == 0) or is_last_epoch
-        )
+            ((epoch - start_epoch + 1) % save_every == 0) or is_last_epoch)
 
         if need_ckpt:
-            ckpt_path = os.path.join(ckpt_dir, f"{run_name}_e{epoch:03d}.pt")
+            ckpt_path = os.path.join(ckpt_dir, f"{run_name}_e{epoch+1:03d}.pt")
             extra = {
                 "epoch_loss": float(ep_loss),
                 "epoch_content": float(ep_content),
@@ -216,9 +221,12 @@ def train_stya2k(
                 "images_seen": int(global_step * B),
                 "total_time_sec": float(total_time),}
             
-            save_checkpoint(path=ckpt_path,
-                model=model,optimizer=optimizer,
-                scaler=scaler, epoch=epoch,
+            save_checkpoint(
+                path=ckpt_path,
+                model=model,
+                optimizer=optimizer,
+                scaler=scaler,
+                epoch=epoch,
                 global_step=global_step,
                 extra=extra,)
 
@@ -230,4 +238,6 @@ def train_stya2k(
         return {
             "last_epoch": epoch,
             "global_step": global_step,
-            "scaler_state_dict": (scaler.state_dict() if scaler is not None else None),}
+            "scaler_state_dict": (scaler.state_dict() if scaler is not None else None),
+        }
+
