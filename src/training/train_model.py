@@ -7,9 +7,6 @@ from src.training.chekpoint import *
 from src.training.one_epoch import * 
 from src.data.load_data import make_train_iterator
 
-IMAGENET_MEAN = [0.485, 0.456, 0.406]
-IMAGENET_STD  = [0.229, 0.224, 0.225]
-
 IMAGENET_MEAN_T = torch.tensor(IMAGENET_MEAN).view(1, 3, 1, 1)  
 IMAGENET_STD_T  = torch.tensor(IMAGENET_STD).view(1, 3, 1, 1)   
 
@@ -40,17 +37,17 @@ def save_triplet_grid(
     x_s: torch.Tensor,    # [B,3,H,W] style   (normalizado)
     y: torch.Tensor,      # [B,3,H,W] output  (NO normalizado ImageNet)
     out_path: str):
+    
     """
     Grilla 3x1 (vertical): content, style, mixed.
     """
 
     # content / style: vienen normalizados -> desnormalizar a [0,1]
-    c0 = denorm_imagenet(x_c[0])
-    s0 = denorm_imagenet(x_s[0])
+    c0 = denorm_imagenet(x_c[0]).detach().cpu()
+    s0 = denorm_imagenet(x_s[0]).detach().cpu()
 
-    # output: ya está en espacio de imagen; solo clamp [0,1]
-    y0 = y[0].detach().cpu()
-    y0 = y0.clamp(0.0, 1.0)
+    # output: ya está en espacio de imagen; solo clamp [0,1] y pasar a cpu
+    y0 = y[0].detach().clamp(0.0, 1.0).cpu()
 
     grid = vutils.make_grid(
         torch.stack([c0, s0, y0], dim=0),
@@ -240,4 +237,5 @@ def train_stya2k(
             "global_step": global_step,
             "scaler_state_dict": (scaler.state_dict() if scaler is not None else None),
         }
+
 
