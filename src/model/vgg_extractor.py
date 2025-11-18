@@ -17,8 +17,8 @@ VGG19_IDX2NAME = {
 VGG19_NAME2IDX = {v:k for k,v in VGG19_IDX2NAME.items()}
 
 # Por convención de estilo/perceptual loss usamos activaciones ReLU:
-DEFAULT_CONTENT_LAYERS = ["relu4_1"] # El contenido esta bien representado aca 
-DEFAULT_STYLE_LAYERS   = ["relu1_1","relu2_1","relu3_1","relu4_1","relu5_1"] # El estilo es mas multifacetico y se captura en varias capas 
+DEFAULT_CONTENT_LAYERS = ["relu4_1"]
+DEFAULT_STYLE_LAYERS   = ["relu1_1","relu2_1","relu3_1","relu4_1","relu5_1"]
 
 
 def load_vgg19_features(device="cuda"):
