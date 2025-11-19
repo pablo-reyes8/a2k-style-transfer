@@ -1,5 +1,14 @@
 # StyA2KNet — Attention-Guided Artistic Style Transfer
 
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+![Repo size](https://img.shields.io/github/repo-size/pablo-reyes8/a2k-style-transfer)
+![Last commit](https://img.shields.io/github/last-commit/pablo-reyes8/a2k-style-transfer)
+![Open issues](https://img.shields.io/github/issues/pablo-reyes8/a2k-style-transfer)
+![Contributors](https://img.shields.io/github/contributors/pablo-reyes8/a2k-style-transfer)
+![Forks](https://img.shields.io/github/forks/pablo-reyes8/a2k-style-transfer?style=social)
+![Stars](https://img.shields.io/github/stars/pablo-reyes8/a2k-style-transfer?style=social)
+
 StyA2KNet is a PyTorch implementation of a lightweight attention-driven style transfer pipeline. It combines a frozen VGG19 encoder, a key-query attention fusion module, and an AdaIN-inspired decoder so you can stylize high-resolution images while keeping training stable with perceptual losses and AMP.
 
 ## Contents
