@@ -26,18 +26,19 @@ The goal is to obtain high-resolution, artifact-free stylizations while keeping 
 </p>
 
 ## Contents
-1. [Introduction](#introduction)
-2. [What Is Neural Style Transfer?](#what-is-neural-style-transfer)
-3. [Project Highlights](#project-highlights)
-4. [Results & Qualitative Comparison](#-results-and-qualitative-comparison)
-5. [Repository Structure](#repository-structure)
-6. [Getting Started](#getting-started)
-7. [Usage](#usage)
-8. [Configuration & Hyperparameters](#configuration--hyperparameters)
-9. [Testing](#testing)
-10. [Docker Workflow](#docker-workflow)
-11. [Citation](#citation)
-12. [License](#license)
+1. [What Is Neural Style Transfer?](#what-is-neural-style-transfer)
+2. [Project Highlights](#project-highlights)
+3. [Results & Qualitative Comparison](#results-and-qualitative-comparison)
+4. [Repository Structure](#repository-structure)
+5. [Getting Started](#getting-started)
+6. [Usage](#usage)
+7. [Configuration & Hyperparameters](#configuration--hyperparameters)
+8. [Testing](#testing)
+9. [Docker Workflow](#docker-workflow)
+10. [Citation](#citation)
+11. [License](#license)
+
+
 
 ## What Is Neural Style Transfer?
 
