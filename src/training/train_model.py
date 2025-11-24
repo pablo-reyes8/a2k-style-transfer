@@ -232,8 +232,7 @@ def train_stya2k(
         return {
             "last_epoch": epoch,
             "global_step": global_step,
-            "scaler_state_dict": (scaler.state_dict() if scaler is not None else None),
-        }
+            "scaler_state_dict": (scaler.state_dict() if scaler is not None else None)}
 
 
 
