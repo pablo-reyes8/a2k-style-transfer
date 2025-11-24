@@ -5,104 +5,110 @@ from typing import Dict, Tuple, Iterable, List
 from src.model.vgg_extractor import *
 
 
-IMAGENET_MEAN = [0.485, 0.456, 0.406]
-IMAGENET_STD  = [0.229, 0.224, 0.225]
+def gram_matrix_optimized(input_tensor):
+    """
+    Calcula Gram Matrix normalizada SOLO por tamaño espacial.
+    Esto evita que los valores se vuelvan infinitesimales.
+    """
+    B, C, H, W = input_tensor.size()
+    features = input_tensor.view(B, C, H * W)
+    G = torch.bmm(features, features.transpose(1, 2)) 
+    
+    return G.div(H * W)
 
 
-def gram_matrix(feat: torch.Tensor) -> torch.Tensor:
-    """
-    feat: [B,C,H,W] -> Gram por batch, normalizado por (H*W) (no por C*H*W)
-    FP32 para estabilidad en FP16/BF16.
-    """
-    B, C, H, W = feat.shape
-    F = feat.float().view(B, C, H * W)              # FP32
-    G = torch.bmm(F, F.transpose(1, 2))             # [B,C,C] FP32
-    G = G / (H * W)
-    return G
-
-
-def total_variation_loss(x: torch.Tensor) -> torch.Tensor:
-    """
-    TV loss simple: suaviza diferencias entre píxeles vecinos.
-    """
-    dh = (x[:, :, 1:, :] - x[:, :, :-1, :]).pow(2).mean()
-    dw = (x[:, :, :, 1:] - x[:, :, :, :-1]).pow(2).mean()
-    return dh + dw
-
-
-class PerceptualLoss(nn.Module):
-    """
-    Perceptual + Style Loss estable:
-      - content: L2 entre activaciones (FP32 en pred)
-      - style:  L2 entre Gram matrices (FP32)
-      - tv:     Total Variation sobre la predicción
-    """
-    def __init__(self,
-                 loss_extractor: VGGFeatureExtractor,
-                 content_layers: List[str] = None,
-                 style_layers: List[str] = None,
-                 content_weights: Dict[str,float] = None,
-                 style_weights: Dict[str,float] = None,
-                 clamp_pred: bool = True,
-                 w_tv: float = 1e-6):
+class StyleTransferLoss(nn.Module):
+    def __init__(self, encoder, content_weight=1.0, style_weight=5.0, tv_weight=1e-5, style_layer_weights=None, moment_weight=1.0):
+        """
+        ARGS:
+            moment_weight (float): Peso extra para forzar coincidencia de Media/Std (Color).
+                                   Recomendado: 1.0 a 5.0 si quieres mucho color.
+        """
         super().__init__()
-        self.extractor = loss_extractor.eval()
-        for p in self.extractor.parameters():
-            p.requires_grad = False
-
-        self.content_layers = content_layers or DEFAULT_CONTENT_LAYERS
-        self.style_layers   = style_layers   or DEFAULT_STYLE_LAYERS
-        self.content_w = content_weights or {l: 1.0 for l in self.content_layers}
-        self.style_w   = style_weights   or {l: 1.0 for l in self.style_layers}
-        self.l2 = nn.MSELoss(reduction="mean")
-        self.clamp_pred = clamp_pred
-        self.w_tv = float(w_tv)
-
-        # buffers de normalización ImageNet para VGG
-        mean = torch.tensor(IMAGENET_MEAN).view(1, 3, 1, 1)
-        std  = torch.tensor(IMAGENET_STD).view(1, 3, 1, 1)
-        self.register_buffer("vgg_mean", mean)
-        self.register_buffer("vgg_std", std)
-
-    def forward(self, pred: torch.Tensor,
-                content: torch.Tensor,
-                style: torch.Tensor):
-
-        with torch.no_grad():
-            f_c_true = self.extractor(content)
-            f_s_true = self.extractor(style)
-
-        # Predicción: clamp en [0,1] para imagen y normalización tipo VGG
-        if self.clamp_pred:
-            pred_img = pred.clamp(0.0, 1.0)
+        self.encoder = encoder
+        
+        # Pesos globales
+        self.cw = content_weight
+        self.sw = style_weight
+        self.tvw = tv_weight
+        self.mw  = moment_weight # Peso de momentos (Color)
+        
+        if style_layer_weights is None:
+            self.style_layer_weights = {
+                'relu1_1': 1.0, 
+                'relu2_1': 1.0, 
+                'relu3_1': 1.0, 
+                'relu4_1': 1.0}
         else:
-            pred_img = pred
+            self.style_layer_weights = style_layer_weights
+        
+        self.mse = nn.MSELoss()
+        
+        # Constantes ImageNet
+        self.register_buffer('mean', torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1))
+        self.register_buffer('std',  torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1))
 
-        # normalizar como VGG: (x - mean)/std
-        mean = self.vgg_mean.to(pred_img.device, dtype=pred_img.dtype)
-        std  = self.vgg_std.to(pred_img.device, dtype=pred_img.dtype)
-        pred_vgg = (pred_img - mean) / std
+    def normalize_prediction(self, img_0_1):
+        return (img_0_1 - self.mean) / self.std
 
-        with torch.cuda.amp.autocast(enabled=False):
-            f_pred = self.extractor(pred_vgg.float())
+    def calculate_tv(self, img):
+        return (torch.sum(torch.abs(img[:, :, :, :-1] - img[:, :, :, 1:])) + 
+                torch.sum(torch.abs(img[:, :, :-1, :] - img[:, :, 1:, :]))) / img.numel()
 
-        # Content loss
-        lc = 0.0
-        for l in self.content_layers:
-            lc = lc + self.content_w[l] * self.l2(f_pred[l], f_c_true[l])
+    def calc_mean_std(self, feat, eps=1e-5):
+        """Calcula media y desviación estándar espacial."""
+        size = feat.size()
+        N, C = size[:2]
+        feat_var = feat.view(N, C, -1).var(dim=2) + eps
+        feat_std = feat_var.sqrt().view(N, C, 1, 1)
+        feat_mean = feat.view(N, C, -1).mean(dim=2).view(N, C, 1, 1)
+        return feat_mean, feat_std
 
-        #  Style loss (Gram matrices)
-        ls = 0.0
-        for l in self.style_layers:
-            Gp = gram_matrix(f_pred[l])
-            Gs = gram_matrix(f_s_true[l])
-            ls = ls + self.style_w[l] * self.l2(Gp, Gs)
-
-        #  Total Variation sobre la imagen predicha (en espacio [0,1])
-        ltv = self.w_tv * total_variation_loss(pred_img)
-
-        total = lc + ls + ltv
-        return total, {
-            "content": float(lc.detach()),
-            "style":   float(ls.detach()),
-            "tv":      float(ltv.detach())}
+    
+    def forward(self, pred_logits, target_content_norm, target_style_norm):
+        
+        pred_img_0_1 = torch.sigmoid(pred_logits)
+        pred_norm = self.normalize_prediction(pred_img_0_1)
+        
+        # Concatenar para una sola pasada
+        full_batch = torch.cat([pred_norm, target_content_norm, target_style_norm], dim=0)
+        feats = self.encoder(full_batch)
+        
+        # Separar
+        b = pred_logits.size(0)
+        f_pred = {k: v[:b] for k, v in feats.items()}
+        f_cont = {k: v[b:2*b] for k, v in feats.items()}
+        f_styl = {k: v[2*b:] for k, v in feats.items()}
+        
+        #  CONTENT LOSS 
+        loss_c = self.mse(f_pred['relu4_1'], f_cont['relu4_1'].detach())
+        
+        # STYLE LOSS (Gram + Momentos) 
+        loss_s = 0.0
+        
+        for layer, w in self.style_layer_weights.items():
+            if layer in f_pred:
+                # GRAM LOSS (Textura)
+                gp = gram_matrix_optimized(f_pred[layer])
+                gs = gram_matrix_optimized(f_styl[layer])
+                loss_gram = self.mse(gp, gs.detach())
+                
+                # MOMENT LOSS (Color y Atmósfera) 
+                # Calculamos media y std de la predicción y el target
+                m_pred, s_pred = self.calc_mean_std(f_pred[layer])
+                m_styl, s_styl = self.calc_mean_std(f_styl[layer])
+                
+                loss_moments = self.mse(m_pred, m_styl.detach()) + self.mse(s_pred, s_styl.detach())
+                
+                loss_s += w * (loss_gram + (self.mw * loss_moments))
+            
+        #  TV LOSS 
+        loss_tv = self.calculate_tv(pred_img_0_1)
+        
+        total_loss = (self.cw * loss_c) + (self.sw * loss_s) + (self.tvw * loss_tv)
+        
+        return total_loss, {
+            "total": total_loss.item(),
+            "content": loss_c.item(),
+            "style": loss_s.item(),
+            "tv": loss_tv.item()}
