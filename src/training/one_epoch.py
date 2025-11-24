@@ -13,8 +13,8 @@ def train_one_epoch(
     amp_enabled: bool = True,
     amp_dtype: str = "bf16",   # "bf16" o "fp16"
     scaler=None,
-    grad_clip: float | None = None,
-):
+    grad_clip: float | None = None,):
+
     """
     Entrena StyA2KNet por 1 época usando PerceptualLoss.
 
@@ -87,13 +87,11 @@ def train_one_epoch(
                 f"[step {step+1:4d}/{steps_per_epoch}] "
                 f"loss={avg_loss:.4f}  "
                 f"content={avg_lc:.4f}  style={avg_ls:.4f}  "
-                f"time={elapsed_s:.1f}s"
-            )
+                f"time={elapsed_s:.1f}s")
 
     steps = min(steps_per_epoch, step + 1)
     return {
         "loss":    running_loss / steps,
         "content": running_content / steps,
         "style":   running_style / steps,
-        "steps":   steps,
-    }
+        "steps":   steps}
