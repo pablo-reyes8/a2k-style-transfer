@@ -3,84 +3,55 @@ import torch
 import torch.nn as nn
 
 
-class ConvBlock(nn.Module):
-    def __init__(self, in_ch, out_ch, k=3, s=1, p=1, act=True, use_norm=False):
+class StyA2KDecoderMultiLevel(nn.Module):
+    def __init__(self):
         super().__init__()
-        layers = [
-            nn.ReflectionPad2d(p),
-            nn.Conv2d(in_ch, out_ch, kernel_size=k, stride=s, padding=0)]
 
-        if use_norm:
-            layers.append(nn.InstanceNorm2d(out_ch, affine=True))
-            
-        if act:
-            layers.append(nn.ReLU(inplace=True))
-        self.block = nn.Sequential(*layers)
+        # --- Bloque 4 (512 -> 256) ---
+        self.block4_up = nn.Sequential(
+            nn.Upsample(scale_factor=2, mode='nearest'), # 32->64
+            ConvBlock(512, 256),
+            ConvBlock(256, 256),
+            ConvBlock(256, 256))
 
-    def forward(self, x):
-        return self.block(x)
+        #  Mixer Layer 
+        # Aquí mezclamos lo que viene de arriba con la fusión del nivel 3
+        # Entrada: 256 (del block4) + 256 (de la fusión nivel 3) = 512
+        self.mix_3 = nn.Sequential(
+            nn.Conv2d(512, 256, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True))
 
+        # Bloque 3 (256 -> 128) 
+        self.block3_up = nn.Sequential(
+            nn.Upsample(scale_factor=2, mode='nearest'), # 64->128
+            ConvBlock(256, 128),
+            ConvBlock(128, 128))
 
-class StyA2KDecoder(nn.Module):
-    """
-    Decoder tipo AdaIN:
-        in:  [B, 512, ~31, ~31]  (features desde relu4_1 + attention fusion)
-        out: [B, 3, 252, 252]    (imagen estilizada)
-
-    Arquitectura (aprox AdaIN):
-      Upsample
-        512 -> 256
-      Upsample
-        256 -> 256 -> 256 -> 128
-      Upsample
-        128 -> 128 -> 64 -> 64 -> 3
-    """
-    def __init__(self, out_size=(252, 252)):
-        super().__init__()
-        self.out_size = out_size
-
-        # Bloque alto nivel (512 -> 256)
-        # Sin InstanceNorm para no destruir estadísticos de estilo
-        self.block1 = ConvBlock(512, 256, use_norm=False)
-
-        # Bloque medio (256 -> 256 -> 256 -> 128)
-        self.block2_1 = ConvBlock(256, 256, use_norm=False)
-        self.block2_2 = ConvBlock(256, 256, use_norm=False)
-        self.block2_3 = ConvBlock(256, 128, use_norm=False)
-
-        # Bloque bajo (128 -> 128 -> 64 -> 64 -> 3)
-        self.block3_1 = ConvBlock(128, 128, use_norm=False)
-        self.block3_2 = ConvBlock(128, 64,  use_norm=False)
-        self.block3_3 = ConvBlock(64,  64,  use_norm=False)
-
-        # última conv: solo conv + pad, sin activación (salida en R^3)
+        # Bloque 2 (128 -> 64) 
+        self.block2_up = nn.Sequential(
+            nn.Upsample(scale_factor=2, mode='nearest'), # 128->256
+            ConvBlock(128, 64),
+            ConvBlock(64, 64))
+        
         self.out_conv = nn.Sequential(
             nn.ReflectionPad2d(1),
-            nn.Conv2d(64, 3, kernel_size=3, stride=1, padding=0),)
+            nn.Conv2d(64, 3, kernel_size=3, padding=0))
 
-    def forward(self, x):
+    def forward(self, x_fused_4, x_fused_3):
         """
-        x: [B, 512, H, W] ~ [B, 512, 31, 31]
+        x_fused_4: [B, 512, 32, 32] -> Viene de fusión relu4_1
+        x_fused_3: [B, 256, 64, 64] -> Viene de fusión relu3_1
         """
-        # Upsample + bloque alto nivel
-        x = F.interpolate(x, scale_factor=2.0, mode="nearest")  # ~ 62x62
-        x = self.block1(x)  # 512 -> 256
+        
+        #  Procesar nivel 4 y subir resolución
+        h = self.block4_up(x_fused_4) # Salida: [B, 256, 64, 64]
+        
+        # Concatenamos con la fusión del nivel 3
+        h_cat = torch.cat([h, x_fused_3], dim=1) # [B, 512, 64, 64]
+        h = self.mix_3(h_cat)                    # [B, 256, 64, 64]
+        
+        h = self.block3_up(h) # [B, 128, 128, 128]
+        h = self.block2_up(h)  # [B, 64, 256, 256]
+        
+        return self.out_conv(h) # [B, 3, 256, 256]
 
-        # Upsample + bloques medios
-        x = F.interpolate(x, scale_factor=2.0, mode="nearest")  # ~ 124x124
-        x = self.block2_1(x)
-        x = self.block2_2(x)
-        x = self.block2_3(x)  # 256 -> 128
-
-        # Upsample + bloques bajos
-        x = F.interpolate(x, scale_factor=2.0, mode="nearest")  # ~ 248x248
-        x = self.block3_1(x)
-        x = self.block3_2(x)
-        x = self.block3_3(x)
-        x = self.out_conv(x)  # 64 -> 3
-
-        # Ajuste fino a 252x252
-        x = F.interpolate(x, size=self.out_size,
-                          mode="bilinear", align_corners=False)
-
-        return x
