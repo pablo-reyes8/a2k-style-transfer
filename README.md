@@ -9,34 +9,162 @@
 ![Forks](https://img.shields.io/github/forks/pablo-reyes8/a2k-style-transfer?style=social)
 ![Stars](https://img.shields.io/github/stars/pablo-reyes8/a2k-style-transfer?style=social)
 
-StyA2KNet is a PyTorch implementation of a lightweight attention-driven style transfer pipeline. It combines a frozen VGG19 encoder, a key-query attention fusion module, and an AdaIN-inspired decoder so you can stylize high-resolution images while keeping training stable with perceptual losses and AMP.
+StyA2KNet is a PyTorch implementation of an attention-guided neural style transfer framework.  
+The model combines a frozen VGG19 encoder, **multi-level key–query attention fusion**, and an AdaIN-inspired decoder trained with a **moment-aware perceptual loss** (content, Gram, mean/std, TV).  
+The goal is to obtain high-resolution, artifact-free stylizations while keeping training numerically stable (AMP, gradient clipping, regression tests).
+
+<p align="center">
+  <img src="internet_experimentation/test_grito.jpg"
+       alt="Munch – The Scream style transfer (Amsterdam canal scene)"
+       width="70%" />
+</p>
+
+<p align="center">
+  <img src="samples_high/sample_000.png"
+       alt="Munch – The Scream style transfer (Amsterdam canal scene)"
+       width="70%" />
+</p>
 
 ## Contents
 1. [Introduction](#introduction)
 2. [What Is Neural Style Transfer?](#what-is-neural-style-transfer)
 3. [Project Highlights](#project-highlights)
-4. [Repository Structure](#repository-structure)
-5. [Getting Started](#getting-started)
-6. [Usage](#usage)
-7. [Configuration & Hyperparameters](#configuration--hyperparameters)
-8. [Testing](#testing)
-9. [Docker Workflow](#docker-workflow)
-10. [Citation](#citation)
-11. [License](#license)
-
-## Introduction
-This repository packages all of the components required to train, evaluate, and showcase StyA2KNet. It includes dataloaders built on Hugging Face Datasets, reusable training utilities with AMP + checkpointing, reproducible notebooks, and pytest-based regression tests to keep the architecture healthy as the project evolves.
+4. [Results & Qualitative Comparison](#-results-and-qualitative-comparison)
+5. [Repository Structure](#repository-structure)
+6. [Getting Started](#getting-started)
+7. [Usage](#usage)
+8. [Configuration & Hyperparameters](#configuration--hyperparameters)
+9. [Testing](#testing)
+10. [Docker Workflow](#docker-workflow)
+11. [Citation](#citation)
+12. [License](#license)
 
 ## What Is Neural Style Transfer?
-Neural style transfer renders a *content* image in the visual style of a *style* reference by optimizing or training a model to match feature statistics extracted from a pretrained vision backbone (commonly VGG19). Content similarity is enforced via feature reconstruction, whereas style is captured via Gram matrices or attention-based statistics. Modern feed-forward networks such as StyA2KNet learn to approximate this optimization with a single forward pass, enabling real-time stylization.
+
+Neural style transfer renders a *content* image in the visual style of a *style* reference by matching statistics of deep features extracted from a pretrained vision backbone (typically VGG19).  
+Content is preserved via **feature reconstruction**, while style is captured by **Gram matrices** and/or **feature distribution statistics** (e.g. channel-wise mean and variance).  
+Feed-forward models such as StyA2KNet approximate this optimization in a single pass, enabling real-time stylization.
+
+In this project we focus on:
+
+- **Attention-guided alignment** between content and style (spatial cross-attention instead of purely global statistics).
+- **Moment-aware style losses**, combining Gram + mean/std matching to better control color and overall “atmosphere”.
+- **Stability at scale**, using AMP + TV regularization so high-resolution stylizations remain sharp and consistent across styles.
 
 ## Project Highlights
-- Attention fusion module (`StyA2KAttentionFusion`) pools style tokens and applies content-aware mixing.
-- AdaIN-inspired decoder trained with perceptual + gram loss for fast stylization.
-- Dual dataloader iterator to balance large-scale content/style datasets while keeping batches aligned.
-- Mixed precision support (BF16/FP16) with a robust GradScaler wrapper and optional gradient clipping.
-- Notebook gallery (`showcase/`, `full_notebooks/`) for experimentation plus CLI-friendly training utilities in `src/training/`.
-- Regression tests in `testing/` to guarantee that architectural blocks remain numerically stable.
+
+- **Multi-level attention fusion (`StyA2KAttentionFusion`)**  
+  Cross-attention blocks at deep (structure) and mid-level (color/texture) features, allowing the model to align style patterns with content geometry rather than just broadcasting global statistics.
+
+- **Moment-aware decoder with composite perceptual loss**  
+  AdaIN-inspired decoder optimized with:
+  - content reconstruction (VGG features),
+  - Gram-based texture matching,
+  - channel-wise mean/std matching (color and global “mood”),
+  - and a small TV term for spatial smoothness.
+
+- **Baseline vs. SOTA variants baked into the repo**  
+  Two model families are kept:
+  - *Baseline (low)*: weaker encoder + shallow attention.
+  - *SOTA (high)*: upgraded encoder + stronger attention + refined loss.  
+  Qualitative tables (`samples_low/`, `samples_high/`, `training samples */`) make it easy to study how each design choice impacts visual quality.
+
+- **Experiment-friendly training loop & diagnostics**  
+  Dual dataloader iterator for content/style balancing, mixed-precision support (BF16/FP16) with a GradScaler wrapper, optional gradient clipping, and CLI configs in `src/training/` for quick ablations, plus notebooks (`showcase/`, `full_notebooks/`) and `pytest` regression tests in `testing/` to guard against silent regressions.
+
+---
+
+## Results and Qualitative Comparison
+
+This section showcases the upgraded **SOTA style-transfer model**  
+(enhanced encoder + attention fusion + moment-aware loss).  
+We present the results in three layers:
+
+1. **Internet-sourced stylizations (famous artworks)** – the most visually striking results.
+2. **Training trajectories (SOTA vertical crops)** – how stylizations evolve across epochs.
+3. **Baseline vs. SOTA research comparison** – side-by-side inference differences.
+
+---
+
+## 1. Internet-Sourced Stylizations (Famous Artwork Styles)
+
+These stylizations use *unseen* artwork references from public sources  
+(e.g., Monet, Van Gogh, Munch, Picasso).  
+All examples come from the upgraded **SOTA model**.
+
+<p align="center">
+  <img src="internet_experimentation/test_monet.jpg"
+       alt="Monet style transfer (Amsterdam waterfront)"
+       width="48%" />
+  <img src="internet_experimentation/test_vangogh.jpg"
+       alt="Van Gogh style transfer (Sydney Opera House)"
+       width="48%" />
+</p>
+
+<p align="center">
+  <img src="internet_experimentation/test_starry_night.jpg"
+       alt="Munch – The Scream style transfer (canal scene)"
+       width="48%" />
+  <img src="internet_experimentation/test_picaso.jpg"
+       alt="Picasso style transfer (Golden Gate Bridge)"
+       width="48%" />
+</p>
+
+
+---
+
+## 2. Training Trajectories (Vertical Crops)
+
+The improved encoder and redesigned loss stack produce noticeably cleaner,
+higher-contrast stylizations early in training.
+
+Below is a compact **3×1 grid** of vertical crops from early SOTA epochs,
+illustrating structural coherence, color consistency, and brushstroke stability:
+
+<p align="center">
+  <img src="training samples high/StyA2K_SOTA_Run_e001.png" width="22%" />
+  <img src="training samples high/StyA2K_SOTA_Run_e014.png" width="22%" />
+  <img src="training samples high/StyA2K_SOTA_Run_second_e024.png" width="22%" />
+</p>
+
+<p align="center">
+  <sub><b>Epoch 1</b> · <b>Epoch 14</b> · <b>Epoch 24</b></sub>
+</p>
+
+Legacy training crops remain in `training samples low/` for reference.
+
+---
+
+## 3. Research Comparison: Baseline (Low) vs. SOTA (High)
+
+We compare the initial **weak-attention model** (baseline)  
+against the upgraded **SOTA model** with a stronger encoder, deeper fusion layers,  
+and an enhanced loss design.
+
+Each row shows the same **content × style** pair rendered by both systems.
+
+| Baseline (low) | SOTA (high) |
+| --- | --- |
+| ![](samples_low/sample_000.png) | ![](samples_high/sample_001.png) |
+| ![](samples_low/sample_002.png) | ![](samples_high/sample_002.png) |
+| ![](samples_low/sample_003.png) | ![](samples_high/sample_003.png) |
+
+**SOTA improvements** include:
+- tighter, more directional brushwork  
+- stronger semantic alignment in attention fusion  
+- improved color-moment matching  
+- reduced artifacts and better global consistency
+
+---
+
+## Additional Qualitative Samples
+
+- Additional SOTA inference snapshots are available in `samples_high/`
+  (e.g., `sample_004.png`, `sample_008.png`, …).
+- Legacy/early-training samples remain in `training samples low/` for side-by-side inspection.
+- Internet experimentation results (Monet, Van Gogh, Munch, Picasso, etc.) are stored in  
+  **`internet_experimentation/`**.
+
 
 ## Repository Structure
 ```
