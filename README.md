@@ -11,7 +11,7 @@
 
 StyA2KNet is a PyTorch implementation of an attention-guided neural style transfer framework.  
 The model combines a frozen VGG19 encoder, **multi-level key–query attention fusion**, and an AdaIN-inspired decoder trained with a **moment-aware perceptual loss** (content, Gram, mean/std, TV).  
-The goal is to obtain high-resolution, artifact-free stylizations while keeping training numerically stable (AMP, gradient clipping, regression tests).
+The goal is to obtain high-resolution, artifact-free stylizations.
 
 <p align="center">
   <img src="internet_experimentation/test_grito.jpg"
