@@ -7,9 +7,6 @@ from src.training.chekpoint import *
 from src.training.one_epoch import * 
 from src.data.load_data import make_train_iterator
 
-IMAGENET_MEAN_T = torch.tensor(IMAGENET_MEAN).view(1, 3, 1, 1)  
-IMAGENET_STD_T  = torch.tensor(IMAGENET_STD).view(1, 3, 1, 1)   
-
 def denorm_imagenet(x: torch.Tensor) -> torch.Tensor:
     """
     x: [3,H,W] o [B,3,H,W] normalizado a ImageNet -> devuelve mismo shape en [0,1].
@@ -32,28 +29,27 @@ def denorm_imagenet(x: torch.Tensor) -> torch.Tensor:
 
     return x
 
-def save_triplet_grid(
-    x_c: torch.Tensor,    # [B,3,H,W] content (normalizado)
-    x_s: torch.Tensor,    # [B,3,H,W] style   (normalizado)
-    y: torch.Tensor,      # [B,3,H,W] output  (NO normalizado ImageNet)
-    out_path: str):
+def save_triplet_grid(x_c, x_s, y, out_path):
+    """
+    x_c, x_s: [B,3,H,W] Normalizados ImageNet
+    y:        [B,3,H,W] Logits crudos del decoder
+    """
     
-    """
-    Grilla 3x1 (vertical): content, style, mixed.
-    """
-
-    # content / style: vienen normalizados -> desnormalizar a [0,1]
+    # Desnormalizar Inputs
     c0 = denorm_imagenet(x_c[0]).detach().cpu()
     s0 = denorm_imagenet(x_s[0]).detach().cpu()
 
-    # output: ya está en espacio de imagen; solo clamp [0,1] y pasar a cpu
-    y0 = y[0].detach().clamp(0.0, 1.0).cpu()
+    # 2. Procesar Output (Logits -> Sigmoid -> CPU)
+    y_img = torch.sigmoid(y[0]).detach().cpu()
+    
+    # Clamp por seguridad visual (aunque sigmoid ya lo deja en 0-1)
+    y0 = y_img.clamp(0.0, 1.0)
 
     grid = vutils.make_grid(
         torch.stack([c0, s0, y0], dim=0),
         nrow=1,
         padding=2)
-
+    
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     vutils.save_image(grid, out_path)
     print(f"└─ [SAMPLE] grid guardada en {out_path}")
@@ -71,6 +67,7 @@ def _fmt_hms(sec: float) -> str:
         return f"{h:02d}:{m:02d}:{s:02d}"
     else:
         return f"{m:02d}:{s:02d}"
+
 
 def train_stya2k(
     model,
@@ -237,5 +234,6 @@ def train_stya2k(
             "global_step": global_step,
             "scaler_state_dict": (scaler.state_dict() if scaler is not None else None),
         }
+
 
 
