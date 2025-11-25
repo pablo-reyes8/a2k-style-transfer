@@ -85,19 +85,19 @@ All examples come from the upgraded **SOTA model**.
 <p align="center">
   <img src="internet_experimentation/test_monet.jpg"
        alt="Monet style transfer (Amsterdam waterfront)"
-       width="48%" />
+       width="70%" />
   <img src="internet_experimentation/test_vangogh.jpg"
        alt="Van Gogh style transfer (Sydney Opera House)"
-       width="48%" />
+       width="70%" />
 </p>
 
 <p align="center">
   <img src="internet_experimentation/test_starry_night.jpg"
        alt="Munch – The Scream style transfer (canal scene)"
-       width="48%" />
+       width="70%" />
   <img src="internet_experimentation/test_picaso.jpg"
        alt="Picasso style transfer (Golden Gate Bridge)"
-       width="48%" />
+       width="70%" />
 </p>
 
 
@@ -378,6 +378,7 @@ If this codebase helps your research, please cite the foundational works that in
 
 ## License
 This project is distributed under the [MIT License](LICENSE). Feel free to use it in research or production with attribution.
+
 
 
 
