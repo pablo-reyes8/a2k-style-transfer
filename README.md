@@ -238,14 +238,21 @@ train_iter = make_train_iterator(content_loader, style_loader)
 import torch
 from torch.optim import Adam
 from src.model.styA2kNet import StyA2KNet
-from src.model.loss import PerceptualLoss, build_vgg_loss_extractor
+from src.model.loss import StyleTransferLoss
+from src.model.vgg_extractor import get_vgg_encoder
 from src.training.train_model import train_stya2k
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-model = StyA2KNet(device=device).to(device)
-loss_extractor = build_vgg_loss_extractor(device=device)
-criterion = PerceptualLoss(loss_extractor)
-optimizer = Adam(model.parameters(), lr=1e-4)
+encoder = get_vgg_encoder(device=device)
+model = StyA2KNet(encoder=encoder, device=device).to(device)
+criterion = StyleTransferLoss(
+    encoder=get_vgg_encoder(device=device),
+    content_weight=1.0,
+    style_weight=6.0,
+    moment_weight=2.0,
+    tv_weight=1e-5,
+)
+optimizer = Adam(model.parameters(), lr=8e-5)
 
 state = train_stya2k(
     model=model,
@@ -256,7 +263,7 @@ state = train_stya2k(
     grad_clip=1.0,
     amp_enabled=True,
     amp_dtype="bf16",
-    run_name="StyA2KNet",
+    run_name="StyA2K_SOTA",
     content_loader=content_loader,
     style_loader=style_loader,
 )
@@ -272,15 +279,26 @@ The trainer automatically:
 Prefer Python scripts over notebooks? Launch training or inference headlessly:
 
 ```bash
-# Training with the default config
-python scripts/train.py --config configs/stya2k_base.yaml --checkpoint-out checkpoints/stya2k_latest.pt
+# Baseline (legacy) config
+python scripts/train.py --config configs/stya2k_base.yaml --checkpoint-out checkpoints/baseline_last.pt
+
+# SOTA config (stronger encoder + loss)
+python scripts/train.py --config configs/stya2k_sota.yaml --checkpoint-out checkpoints/sota_last.pt
 
 # Stylize an image pair
 python scripts/infer.py \
-  --checkpoint checkpoints/stya2k_latest.pt \
+  --checkpoint checkpoints/sota_last.pt \
   --content path/to/content.jpg \
   --style path/to/style.jpg \
   --output stylized.png
+
+# Fuse multiple styles with weights
+python scripts/infer.py \
+  --checkpoint checkpoints/sota_last.pt \
+  --content path/to/content.jpg \
+  --style style_a.jpg --style style_b.jpg \
+  --style-weights 0.6 0.4 \
+  --output stylized_fused.png
 ```
 Both scripts mirror the notebook logic: the trainer loads Hugging Face datasets, while the inference script applies the trained weights to any RGB pair and writes the denormalized output.
 
@@ -294,26 +312,33 @@ save_checkpoint("checkpoints/stya2k_e040.pt", model, optimizer, epoch=40, global
 ### Stylizing Images
 After training, run inference by forwarding content/style tensors through the model:
 ```python
+from src.inference.internet_inference import build_inference_transform, fuse_styles, prepare_tensor_from_source
+
+tfm = build_inference_transform(size=256)
+content = prepare_tensor_from_source("content.jpg", tfm, device)
+style_a = prepare_tensor_from_source("style_a.jpg", tfm, device)
+style_b = prepare_tensor_from_source("style_b.jpg", tfm, device)
+style = fuse_styles([style_a, style_b], weights=[0.7, 0.3])
+
 with torch.no_grad():
-    y = model(x_content.to(device), x_style.to(device))
+    y = model(content, style, alpha=0.9)
 ```
-`src/data/data_utils.py` includes helpers such as `denorm` and `show_examples` for quick visualization.
+`src/inference/` includes ready-to-use helpers for downloading/reading images, denormalizing grids, and fusing multiple style references.
 
 ## Configuration & Hyperparameters
-- `configs/stya2k_base.yaml` captures the canonical experiment setup (batch size, dataset sizes, attention dims, optimizer, AMP flags, etc.).
-- Override it or create a new YAML under `configs/` to track alternate runs.
-- Surface-level toggles:
-  - `model.fusion.key_dim`: attention bottleneck.
-  - `model.decoder.out_size`: output resolution.
-  - `loss.content_weights` / `loss.style_weights`: perceptual balance.
-  - `training.amp_dtype` / `training.grad_clip`: mixed-precision safety.
+- `configs/stya2k_base.yaml` now documents the **baseline/legacy** recipe discussed in the README.
+- `configs/stya2k_sota.yaml` captures the upgraded **SOTA** settings (256px crops, stronger style+moment weights, curated dataset sizes).
+- Override either YAML or drop your own under `configs/` to track ablations:
+  - `loss.style_weight` / `loss.moment_weight`: texture vs. color balance.
+  - `data.*.random_resized_crop_scale`: how aggressively to zoom/crop content vs. style.
+  - `training.amp_dtype` / `training.grad_clip`: mixed-precision safety knobs.
 
 ## Testing
 Run the regression suite to ensure architectural components behave as expected:
 ```bash
 pytest testing
 ```
-`testing/test_models.py` covers the attention fusion block, decoder, and the end-to-end StyA2KNet forward pass through a mocked VGG encoder.
+`testing/` now covers data utilities (filters + dual iterator), the moment-aware loss, attention fusion, the multi-level decoder, and an end-to-end StyA2KNet forward pass through a mocked encoder.
 
 ## Docker Workflow
 Build and run a reproducible GPU-ready environment:
