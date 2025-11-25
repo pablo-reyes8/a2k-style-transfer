@@ -16,7 +16,7 @@ def train_one_epoch(
     grad_clip: float | None = None,):
 
     """
-    Entrena StyA2KNet por 1 época usando PerceptualLoss.
+    Entrena StyA2KNet por 1 época usando la pérdida perceptual estilo/color.
 
     Devuelve:
       {

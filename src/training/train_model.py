@@ -3,14 +3,24 @@ import torchvision.utils as vutils
 import torch
 
 from src.training.gradscaler import * 
-from src.training.chekpoint import *
+from src.training.chekpoint import * 
 from src.training.one_epoch import * 
-from src.data.load_data import make_train_iterator
+from src.data.load_data import (
+    IMAGENET_MEAN,
+    IMAGENET_STD,
+    make_train_iterator,
+)
 
 def denorm_imagenet(x: torch.Tensor) -> torch.Tensor:
     """
     x: [3,H,W] o [B,3,H,W] normalizado a ImageNet -> devuelve mismo shape en [0,1].
     """
+    # Precompute mean/std tensors once to keep everything on-device
+    global IMAGENET_MEAN_T, IMAGENET_STD_T
+    if "IMAGENET_MEAN_T" not in globals():
+        IMAGENET_MEAN_T = torch.tensor(IMAGENET_MEAN).view(1, 3, 1, 1)
+        IMAGENET_STD_T = torch.tensor(IMAGENET_STD).view(1, 3, 1, 1)
+
     # Asegurarnos de tener shape [B,3,H,W] para aplicar mean/std broadcast
     squeeze_back = False
     if x.dim() == 3:
