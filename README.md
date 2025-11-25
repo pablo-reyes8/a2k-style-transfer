@@ -195,7 +195,7 @@ style_transfer/
 
 ### Installation
 ```bash
-git clone https://github.com/<your-user>/style_transfer.git
+git clone https://github.com/pablo-reyes8/style_transfer.git
 cd style_transfer
 python -m venv .venv && source .venv/bin/activate
 pip install --upgrade pip
@@ -322,6 +322,21 @@ style = fuse_styles([style_a, style_b], weights=[0.7, 0.3])
 
 with torch.no_grad():
     y = model(content, style, alpha=0.9)
+
+#### Second Option:
+
+from src.inference.internet_inferencev2 import *
+
+url_content = "contentet.png" 
+url_style   = "style.jpeg" 
+
+run_style_transfer_inference(
+    model=model,
+    content_source=url_content,
+    style_source=url_style,
+    output_path="test_vangogh.jpg",
+    device=device)
+
 ```
 `src/inference/` includes ready-to-use helpers for downloading/reading images, denormalizing grids, and fusing multiple style references.
 
@@ -374,4 +389,5 @@ If this codebase helps your research, please cite the foundational works that in
 
 ## License
 This project is distributed under the [MIT License](LICENSE). Feel free to use it in research or production with attribution.
+
 
