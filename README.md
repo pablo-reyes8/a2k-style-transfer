@@ -54,24 +54,13 @@ In this project we focus on:
 
 ## Project Highlights
 
-- **Multi-level attention fusion (`StyA2KAttentionFusion`)**  
-  Cross-attention blocks at deep (structure) and mid-level (color/texture) features, allowing the model to align style patterns with content geometry rather than just broadcasting global statistics.
+- **Multi-Level Fusion:** Uses **Cross-Attention** at both deep (structure) and mid-level (color/texture) layers to align style patterns without deforming content geometry.
 
-- **Moment-aware decoder with composite perceptual loss**  
-  AdaIN-inspired decoder optimized with:
-  - content reconstruction (VGG features),
-  - Gram-based texture matching,
-  - channel-wise mean/std matching (color and global “mood”),
-  - and a small TV term for spatial smoothness.
+- **Color-Aware Loss:** Solves the "gray/washed-out" issue by combining a **Moment Matching Loss** (Mean/Std) with the classic Gram Matrix, ensuring vibrant and accurate color transfer.
 
-- **Baseline vs. SOTA variants baked into the repo**  
-  Two model families are kept:
-  - *Baseline (low)*: weaker encoder + shallow attention.
-  - *SOTA (high)*: upgraded encoder + stronger attention + refined loss.  
-  Qualitative tables (`samples_low/`, `samples_high/`, `training samples */`) make it easy to study how each design choice impacts visual quality.
+- **Reproducible Research:** Includes both **Baseline (Low)** and **SOTA (High)** model variants to visually demonstrate the impact of architectural improvements.
 
-- **Experiment-friendly training loop & diagnostics**  
-  Dual dataloader iterator for content/style balancing, mixed-precision support (BF16/FP16) with a GradScaler wrapper, optional gradient clipping, and CLI configs in `src/training/` for quick ablations, plus notebooks (`showcase/`, `full_notebooks/`) and `pytest` regression tests in `testing/` to guard against silent regressions.
+- **Stable Training Pipeline:** A robust engineering workflow featuring **Mixed Precision**, gradient clipping, modular configs, and a balanced dual-dataloader for content and style.
 
 ---
 
@@ -389,5 +378,6 @@ If this codebase helps your research, please cite the foundational works that in
 
 ## License
 This project is distributed under the [MIT License](LICENSE). Feel free to use it in research or production with attribution.
+
 
 
