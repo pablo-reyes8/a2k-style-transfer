@@ -4,13 +4,14 @@ from pathlib import Path
 import pytest
 import torch
 from PIL import Image
+import torch.nn as nn
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.data.load_data import DualBatchIterator, filter_valid_images  # noqa: E402
-from src.model.loss import PerceptualLoss  # noqa: E402
+from src.model.loss import StyleTransferLoss  # noqa: E402
 
 
 class DummyHFDataset:
@@ -74,39 +75,44 @@ def test_dual_batch_iterator_aligns_batch_sizes():
         assert x_c.shape[0] == x_s.shape[0]
 
 
-class IdentityExtractor(torch.nn.Module):
-    def forward(self, x):
+class IdentityEncoder(nn.Module):
+    def forward(self, x: torch.Tensor):
         return {"relu4_1": x}
 
 
 @pytest.fixture
-def perceptual_loss():
-    extractor = IdentityExtractor()
-    return PerceptualLoss(
-        loss_extractor=extractor,
-        content_layers=["relu4_1"],
-        style_layers=["relu4_1"],
-        content_weights={"relu4_1": 1.0},
-        style_weights={"relu4_1": 1.0},
-        clamp_pred=False,
+def style_transfer_loss():
+    loss = StyleTransferLoss(
+        encoder=IdentityEncoder(),
+        content_weight=1.0,
+        style_weight=1.0,
+        tv_weight=0.0,
+        moment_weight=0.0,
+        style_layer_weights={"relu4_1": 1.0},
     )
+    # Simplify normalization for deterministic expectations
+    loss.mean.zero_()
+    loss.std.fill_(1.0)
+    return loss
 
 
-def test_perceptual_loss_zero_when_inputs_match(perceptual_loss):
-    x = torch.ones(1, 3, 4, 4)
-    loss, parts = perceptual_loss(x, x, x)
+def test_style_transfer_loss_zero_when_inputs_match(style_transfer_loss):
+    pred_logits = torch.zeros(1, 3, 4, 4)
+    target = torch.full((1, 3, 4, 4), 0.5)
+
+    loss, parts = style_transfer_loss(pred_logits, target, target)
 
     assert pytest.approx(0.0, abs=1e-6) == loss.item()
     assert pytest.approx(0.0, abs=1e-6) == parts["content"]
     assert pytest.approx(0.0, abs=1e-6) == parts["style"]
 
 
-def test_perceptual_loss_detects_content_and_style_shift(perceptual_loss):
-    pred = torch.zeros(1, 3, 4, 4)
-    content = torch.ones(1, 3, 4, 4)
-    style = torch.ones(1, 3, 4, 4) * 2.0
+def test_style_transfer_loss_detects_shifts(style_transfer_loss):
+    pred_logits = torch.zeros(1, 3, 4, 4)
+    content = torch.full((1, 3, 4, 4), 0.25)
+    style = torch.full((1, 3, 4, 4), 0.75)
 
-    _, parts = perceptual_loss(pred, content, style)
+    _, parts = style_transfer_loss(pred_logits, content, style)
 
     assert parts["content"] > 0.0
     assert parts["style"] > 0.0
