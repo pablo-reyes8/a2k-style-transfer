@@ -1,9 +1,9 @@
 experiment:
-  name: StyA2K_Baseline
+  name: StyA2K_SOTA
   seed: 7
-  output_dir: runs/stya2k_baseline
-  checkpoint_dir: checkpoints_baseline
-  sample_dir: samples_baseline
+  output_dir: runs/stya2k_sota
+  checkpoint_dir: checkpoints_sota
+  sample_dir: samples_sota
 
 model:
   device: cuda
@@ -14,9 +14,9 @@ model:
 
 loss:
   content_weight: 1.0
-  style_weight: 5.0
+  style_weight: 6.0
   tv_weight: 1.0e-5
-  moment_weight: 1.0
+  moment_weight: 2.0
   style_layer_weights:
     relu1_1: 1.0
     relu2_1: 1.0
@@ -25,8 +25,8 @@ loss:
     relu5_1: 1.0
 
 data:
-  batch_size: 16
-  num_workers: 2
+  batch_size: 12
+  num_workers: 4
   pin_memory: true
   drop_last: true
   final_size: 256
@@ -34,25 +34,25 @@ data:
     hub_id: phiyodr/coco2017
     config: null
     split: train
-    max_images: 10000
-    random_resized_crop_scale: [0.5, 1.0]
+    max_images: 12000
+    random_resized_crop_scale: [0.55, 1.0]
     horizontal_flip: 0.5
   style:
     hub_id: davanstrien/wikiart-resized
     config: null
     split: train
-    max_images: 15000
-    random_resized_crop_scale: [0.7, 1.0]
-    horizontal_flip: 0.2
+    max_images: 18000
+    random_resized_crop_scale: [0.75, 1.0]
+    horizontal_flip: 0.25
 
 optimizer:
   name: adam
-  lr: 0.0001
+  lr: 0.00008
   betas: [0.9, 0.999]
   weight_decay: 0.0
 
 training:
-  epochs: 40
+  epochs: 50
   amp_enabled: true
   amp_dtype: bf16
   grad_clip: 1.0
