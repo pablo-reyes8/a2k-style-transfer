@@ -16,10 +16,10 @@ VGG19_IDX2NAME = {
 VGG19_NAME2IDX = {v: k for k, v in VGG19_IDX2NAME.items()}
 
 class VGGEncoder(nn.Module):
-    def __init__(self, layers_to_extract=None, device="cuda"):
+    def __init__(self, layers_to_extract=None, device="cuda", pretrained: bool = True):
         super().__init__()
 
-        weights = models.VGG19_Weights.IMAGENET1K_V1
+        weights = models.VGG19_Weights.IMAGENET1K_V1 if pretrained else None
         vgg = models.vgg19(weights=weights).features
         
         for name, layer in vgg.named_children():
@@ -62,8 +62,8 @@ class VGGEncoder(nn.Module):
                 
         return outputs
 
-def get_vgg_encoder(device):
+def get_vgg_encoder(device: str, pretrained: bool = True):
     targets = ["relu1_1", "relu2_1", "relu3_1", "relu4_1", "relu5_1"]
-    return VGGEncoder(layers_to_extract=targets, device=device)
+    return VGGEncoder(layers_to_extract=targets, device=device, pretrained=pretrained)
     
 
