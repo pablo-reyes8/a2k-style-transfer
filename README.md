@@ -16,13 +16,13 @@ The goal is to obtain high-resolution, artifact-free stylizations.
 <p align="center">
   <img src="internet_experimentation/test_grito.jpg"
        alt="Munch – The Scream style transfer (Amsterdam canal scene)"
-       width="80%" />
+       width="80%"/>
 </p>
 
 <p align="center">
   <img src="samples_high/sample_000.png"
        alt="Munch – The Scream style transfer (Amsterdam canal scene)"
-       width="80%" />
+       width="80%"/>
 </p>
 
 ## Contents
@@ -378,6 +378,7 @@ If this codebase helps your research, please cite the foundational works that in
 
 ## License
 This project is distributed under the [MIT License](LICENSE). Feel free to use it in research or production with attribution.
+
 
 
 
