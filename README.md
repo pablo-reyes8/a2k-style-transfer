@@ -103,7 +103,7 @@ All examples come from the upgraded **SOTA model**.
 
 ---
 
-## 2. Training Trajectories (Vertical Crops)
+## 2. Training Trajectories 
 
 The improved encoder and redesigned loss stack produce noticeably cleaner,
 higher-contrast stylizations early in training.
@@ -378,6 +378,7 @@ If this codebase helps your research, please cite the foundational works that in
 
 ## License
 This project is distributed under the [MIT License](LICENSE). Feel free to use it in research or production with attribution.
+
 
 
 
