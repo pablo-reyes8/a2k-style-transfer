@@ -14,13 +14,13 @@ The model combines a frozen VGG19 encoder, **multi-level key–query attention f
 The goal is to obtain high-resolution, artifact-free stylizations.
 
 <p align="center">
-  <img src="internet_experimentation/test_grito.jpg"
+  <img src="inference samples/internet_experimentation/test_grito.jpg"
        alt="Munch – The Scream style transfer (Amsterdam canal scene)"
        width="80%"/>
 </p>
 
 <p align="center">
-  <img src="samples_high/sample_000.png"
+  <img src="inference samples/samples_high/sample_000.png"
        alt="Munch – The Scream style transfer (Amsterdam canal scene)"
        width="80%"/>
 </p>
@@ -83,19 +83,19 @@ These stylizations use *unseen* artwork references from public sources
 All examples come from the upgraded **SOTA model**.
 
 <p align="center">
-  <img src="internet_experimentation/test_monet.jpg"
+  <img src="inference samples/internet_experimentation/test_monet.jpg"
        alt="Monet style transfer (Amsterdam waterfront)"
        width="70%" />
-  <img src="internet_experimentation/test_vangogh.jpg"
+  <img src="inference samples/internet_experimentation/test_vangogh.jpg"
        alt="Van Gogh style transfer (Sydney Opera House)"
        width="70%" />
 </p>
 
 <p align="center">
-  <img src="internet_experimentation/test_starry_night.jpg"
+  <img src="inference samples/internet_experimentation/test_starry_night.jpg"
        alt="Munch – The Scream style transfer (canal scene)"
        width="70%" />
-  <img src="internet_experimentation/test_picaso.jpg"
+  <img src="inference samples/internet_experimentation/test_picaso.jpg"
        alt="Picasso style transfer (Golden Gate Bridge)"
        width="70%" />
 </p>
@@ -112,9 +112,9 @@ Below is a compact **3×1 grid** of vertical crops from early SOTA epochs,
 illustrating structural coherence, color consistency, and brushstroke stability:
 
 <p align="center">
-  <img src="training samples high/StyA2K_SOTA_Run_e001.png" width="22%" />
-  <img src="training samples high/StyA2K_SOTA_Run_e014.png" width="22%" />
-  <img src="training samples high/StyA2K_SOTA_Run_second_e024.png" width="22%" />
+  <img src="training samples/training samples high/StyA2K_SOTA_Run_e001.png" width="22%" />
+  <img src="training samples/training samples high/StyA2K_SOTA_Run_e014.png" width="22%" />
+  <img src="training samples/training samples high/StyA2K_SOTA_Run_second_e024.png" width="22%" />
 </p>
 
 <p align="center">
@@ -135,9 +135,10 @@ Each row shows the same **content × style** pair rendered by both systems.
 
 | Baseline (low) | SOTA (high) |
 | --- | --- |
-| ![](samples_low/sample_000.png) | ![](samples_high/sample_001.png) |
-| ![](samples_low/sample_002.png) | ![](samples_high/sample_002.png) |
-| ![](samples_low/sample_003.png) | ![](samples_high/sample_003.png) |
+| ![](training%20samples/training%20samples%20low/sample_000.png) | ![](training%20samples/training%20samples%20high/sample_001.png) |
+| ![](training%20samples/training%20samples%20low/sample_002.png) | ![](training%20samples/training%20samples%20high/sample_002.png) |
+| ![](training%20samples/training%20samples%20low/sample_003.png) | ![](training%20samples/training%20samples%20high/sample_003.png) |
+
 
 **SOTA improvements** include:
 - tighter, more directional brushwork  
@@ -378,6 +379,7 @@ If this codebase helps your research, please cite the foundational works that in
 
 ## License
 This project is distributed under the [MIT License](LICENSE). Feel free to use it in research or production with attribution.
+
 
 
 
