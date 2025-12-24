@@ -135,9 +135,11 @@ Each row shows the same **content × style** pair rendered by both systems.
 
 | Baseline (low) | SOTA (high) |
 | --- | --- |
-| ![](training%20samples/training%20samples%20low/sample_000.png) | ![](training%20samples/training%20samples%20high/sample_001.png) |
-| ![](training%20samples/training%20samples%20low/sample_002.png) | ![](training%20samples/training%20samples%20high/sample_002.png) |
-| ![](training%20samples/training%20samples%20low/sample_003.png) | ![](training%20samples/training%20samples%20high/sample_003.png) |
+| ![](inference%20samples/samples_low/sample_000.png) | ![](inference%20samples/samples_high/sample_001.png) |
+| ![](inference%20samples/samples_low/sample_002.png) | ![](inference%20samples/samples_high/sample_002.png) |
+| ![](inference%20samples/samples_low/sample_003.png) | ![](inference%20samples/samples_high/sample_003.png) |
+
+
 
 
 **SOTA improvements** include:
@@ -379,6 +381,7 @@ If this codebase helps your research, please cite the foundational works that in
 
 ## License
 This project is distributed under the [MIT License](LICENSE). Feel free to use it in research or production with attribution.
+
 
 
 
