@@ -89,12 +89,6 @@ All examples come from the upgraded **SOTA model**.
   <img src="inference samples/internet_experimentation/test_vangogh.jpg"
        alt="Van Gogh style transfer (Sydney Opera House)"
        width="70%" />
-</p>
-
-<p align="center">
-  <img src="inference samples/internet_experimentation/test_starry_night.jpg"
-       alt="Munch – The Scream style transfer (canal scene)"
-       width="70%" />
   <img src="inference samples/internet_experimentation/test_picaso.jpg"
        alt="Picasso style transfer (Golden Gate Bridge)"
        width="70%" />
@@ -381,6 +375,7 @@ If this codebase helps your research, please cite the foundational works that in
 
 ## License
 This project is distributed under the [MIT License](LICENSE). Feel free to use it in research or production with attribution.
+
 
 
 
