@@ -374,7 +374,8 @@ If this codebase helps your research, please cite the foundational works that in
 ```
 
 ## License
-This project is distributed under the [MIT License](LICENSE). Feel free to use it in research or production with attribution.
+This project is distributed under the [MIT License](LICENSE). Feel free to use it in research or production or reproduction with attribution.
+
 
 
 
