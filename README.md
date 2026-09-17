@@ -6,7 +6,6 @@
 ![Last commit](https://img.shields.io/github/last-commit/pablo-reyes8/a2k-style-transfer)
 ![Open issues](https://img.shields.io/github/issues/pablo-reyes8/a2k-style-transfer)
 ![Contributors](https://img.shields.io/github/contributors/pablo-reyes8/a2k-style-transfer)
-![Forks](https://img.shields.io/github/forks/pablo-reyes8/a2k-style-transfer?style=social)
 ![Stars](https://img.shields.io/github/stars/pablo-reyes8/a2k-style-transfer?style=social)
 
 StyA2KNet is a PyTorch implementation of an attention-guided neural style transfer framework.  
